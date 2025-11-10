@@ -1,0 +1,59 @@
+# Binary executable
+filemgr
+
+# Object files
+*.o
+*.obj
+obj/
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.a
+*.lib
+
+# Core dumps
+core
+core.*
+
+# Editor and IDE files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.sublime-*
+.DS_Store
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Log files
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Build directories
+build/
+dist/
+
+# Test directories (if you add tests later)
+test_output/
+
+# System files
+.directory
+Thumbs.db
