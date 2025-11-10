@@ -1,37 +1,122 @@
-TUI File Manager (C, ncurses)
+# 📁 Terminal File Manager
 
-A simple terminal-based file manager written in C using ncurses. Features:
-- Navigate directories
-- View file/directory info (size, permissions, mtime)
-- Create directory
-- Delete file/directory (non-recursive)
-- Rename/move
-- Copy files
-- Open file with $PAGER
+A professional terminal-based file manager written in C using ncurses library. Features a clean interface with detailed file information display.
 
-Build
+## ✨ Features
+
+- 📂 Navigate directories with intuitive controls
+- 📊 View detailed file information (size, permissions, owner, group, modification time)
+- ➕ Create new directories
+- 🗑️ Delete files and directories (with confirmation)
+- ✏️ Rename/move files and directories
+- 📋 Copy files
+- 👁️ View file contents with system pager
+- 🎨 Color-coded interface with ncurses
+
+## 🏗️ Project Structure
+
+```
+FileManagement2/
+├── include/          # Header files
+│   ├── fs.h         # File system operations
+│   └── ui.h         # User interface
+├── src/             # Source files
+│   ├── fs.c         # File system implementation
+│   ├── ui.c         # UI implementation
+│   └── main.c       # Entry point
+├── obj/             # Object files (generated)
+├── Makefile         # Build configuration
+├── .gitignore       # Git ignore rules
+└── README.md        # This file
+```
+
+## 🔧 Requirements
+
+- GCC compiler (C11 or later)
+- ncurses library
+- Linux/Unix environment
+
+### Install Dependencies
+
+**Ubuntu/Debian:**
+```bash
+sudo apt-get install build-essential libncurses5-dev libncursesw5-dev
+```
+
+**Fedora/RHEL:**
+```bash
+sudo dnf install gcc ncurses-devel
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S base-devel ncurses
+```
+
+## 🚀 Quick Start
+
+### Build
 
 ```bash
 make
 ```
 
-Run
+### Run
 
 ```bash
+./filemgr [start_directory]
+# or
 make run
 ```
 
-Controls
-- Up/Down: navigate
-- Enter: open directory / view file info
-- Backspace: go up
-- n: create directory
-- d: delete selected (confirm)
-- r: rename
-- c: copy file
-- o: open file with $PAGER
-- q: quit
+### Clean Build Artifacts
 
-Notes
-- Minimal, educational project. Use carefully when deleting files.
-- Tested on Linux with ncurses.
+```bash
+make clean
+```
+
+### Rebuild from Scratch
+
+```bash
+make rebuild
+```
+
+## ⌨️ Keyboard Controls
+
+| Key | Action |
+|-----|--------|
+| `↑` / `↓` | Navigate through files and directories |
+| `Enter` | Open directory or view file details |
+| `Backspace` | Go to parent directory |
+| `n` | Create new directory |
+| `d` | Delete selected item (with confirmation) |
+| `r` | Rename/move selected item |
+| `c` | Copy selected file |
+| `o` | Open file with `$PAGER` (default: `less`) |
+| `q` | Quit application |
+
+## 📝 Notes
+
+- This is an educational project demonstrating C programming with ncurses
+- Use caution when deleting files - there's no undo!
+- Directory deletion only works for empty directories
+- Tested on Linux with ncurses library
+
+## 🛠️ Development
+
+### Makefile Targets
+
+- `make` or `make all` - Build the project
+- `make build` - Same as `make all`
+- `make run` - Build and run the program
+- `make clean` - Remove build artifacts
+- `make rebuild` - Clean and rebuild
+- `make info` - Show project build information
+
+## 📄 License
+
+Educational project - feel free to use and modify.
+
+## 🤝 Contributing
+
+This is a learning project. Feel free to fork and experiment!
