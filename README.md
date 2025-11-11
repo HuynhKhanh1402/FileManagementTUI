@@ -36,6 +36,7 @@ FileManagement2/
 │   ├── fs.c         # File system implementation
 │   ├── ui.c         # UI implementation
 │   └── main.c       # Entry point
+├── bin/             # Binary executable (generated)
 ├── obj/             # Object files (generated)
 ├── Makefile         # Build configuration
 ├── .gitignore       # Git ignore rules
@@ -76,7 +77,7 @@ make
 ### Run
 
 ```bash
-./filemgr [start_directory]
+bin/filemgr [start_directory]
 # or
 make run
 ```

@@ -7,7 +7,7 @@ LDFLAGS = -lncurses
 SRCDIR = src
 INCDIR = include
 OBJDIR = obj
-BINDIR = .
+BINDIR = bin
 
 # Files
 SRC = $(wildcard $(SRCDIR)/*.c)
@@ -23,8 +23,11 @@ build: $(BIN)
 $(OBJDIR):
 	mkdir -p $(OBJDIR)
 
+$(BINDIR):
+	mkdir -p $(BINDIR)
+
 # Link object files to create binary
-$(BIN): $(OBJDIR) $(OBJ)
+$(BIN): $(OBJDIR) $(BINDIR) $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDFLAGS)
 	@echo "Build complete: $(BIN)"
 
@@ -34,11 +37,11 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.c
 
 # Run the program
 run: all
-	./$(BIN)
+	$(BIN)
 
 # Clean build artifacts
 clean:
-	rm -rf $(OBJDIR) $(BIN)
+	rm -rf $(OBJDIR) $(BINDIR)
 	@echo "Cleaned build artifacts"
 
 # Rebuild from scratch
