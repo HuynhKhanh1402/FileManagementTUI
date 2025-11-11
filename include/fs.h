@@ -25,4 +25,7 @@ int fm_rename(const char *oldpath, const char *newpath);
 // Copy file (simple, not preserving metadata)
 int fm_copy_file(const char *src, const char *dst);
 
+// Create empty file (similar to touch)
+int fm_create_file(const char *path);
+
 #endif // FM_FS_H

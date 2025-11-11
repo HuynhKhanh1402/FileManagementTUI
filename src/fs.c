@@ -79,3 +79,11 @@ int fm_copy_file(const char *src, const char *dst) {
     close(in); close(out);
     return 0;
 }
+
+int fm_create_file(const char *path) {
+    // Create empty file similar to touch command
+    int fd = open(path, O_WRONLY | O_CREAT | O_EXCL, 0644);
+    if (fd < 0) return -1;
+    close(fd);
+    return 0;
+}

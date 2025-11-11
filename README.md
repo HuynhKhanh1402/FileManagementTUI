@@ -7,7 +7,9 @@ A professional terminal-based file manager written in C using ncurses library. F
 - 📂 Navigate directories with intuitive controls
 - 📊 View detailed file information (size, permissions, owner, group, modification time)
 - ➕ Create new directories
-- 🗑️ Delete files and directories (with confirmation)
+- � Create new empty files (like `touch` command)
+- ℹ️ Display comprehensive info about files/directories (includes access time, inode, etc.)
+- �🗑️ Delete files and directories (with confirmation)
 - ✏️ Rename/move files and directories
 - 📋 Copy files
 - 👁️ View file contents with system pager
@@ -89,9 +91,11 @@ make rebuild
 | `Enter` | Open directory or view file details |
 | `Backspace` | Go to parent directory |
 | `n` | Create new directory |
+| `f` | Create new file (like touch) |
 | `d` | Delete selected item (with confirmation) |
 | `r` | Rename/move selected item |
 | `c` | Copy selected file |
+| `i` | Show detailed information about selected item |
 | `o` | Open file with `$PAGER` (default: `less`) |
 | `q` | Quit application |
 

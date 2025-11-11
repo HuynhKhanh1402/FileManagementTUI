@@ -120,7 +120,7 @@ static void show_status(WINDOW *win, const char *msg) {
 static void draw_help_bar(WINDOW *win) {
     werase(win);
     wattron(win, COLOR_PAIR(4));
-    mvwprintw(win, 0, 0, " [q]Quit [Enter]Open [Bksp]Up [n]NewDir [d]Del [r]Rename [c]Copy [o]View");
+    mvwprintw(win, 0, 0, " [q]Quit [Enter]Open [Bksp]Up [n]NewDir [f]NewFile [d]Del [r]Rename [c]Copy [i]Info [o]View");
     wattroff(win, COLOR_PAIR(4));
     wnoutrefresh(win);
 }
@@ -301,6 +301,21 @@ int fm_ui_run(const char *startpath) {
                 wgetch(stdscr);
             }
         }
+        else if (ch == 'f' || ch == 'F') {
+            char name[PATH_MAX];
+            prompt_input(status, "New file name: ", name, sizeof(name));
+            if (strlen(name) > 0) {
+                char path[PATH_MAX];
+                snprintf(path, sizeof(path), "%s/%s", cwd, name);
+                if (fm_create_file(path) == 0) {
+                    show_status(status, "✓ File created successfully. Press any key...");
+                } else {
+                    show_status(status, "✗ Failed to create file (may already exist). Press any key...");
+                }
+                doupdate();
+                wgetch(stdscr);
+            }
+        }
         else if (ch == 'd' || ch == 'D') {
             if (count == 0) continue;
             fm_entry *e = &items[sel];
@@ -358,6 +373,38 @@ int fm_ui_run(const char *startpath) {
                     wgetch(stdscr);
                 }
             }
+        }
+        else if (ch == 'i' || ch == 'I') {
+            if (count == 0) continue;
+            fm_entry *e = &items[sel];
+            
+            /* Build detailed info string */
+            char info[2048];
+            char perms[12], size_str[16];
+            format_perms(e->st.st_mode, perms);
+            format_size(e->st.st_size, size_str, sizeof(size_str));
+            
+            struct passwd *pw = getpwuid(e->st.st_uid);
+            struct group *gr = getgrgid(e->st.st_gid);
+            struct tm *tm_mtime = localtime(&e->st.st_mtime);
+            struct tm *tm_atime = localtime(&e->st.st_atime);
+            
+            char mtime_str[64], atime_str[64];
+            strftime(mtime_str, sizeof(mtime_str), "%Y-%m-%d %H:%M:%S", tm_mtime);
+            strftime(atime_str, sizeof(atime_str), "%Y-%m-%d %H:%M:%S", tm_atime);
+            
+            const char *type = e->is_dir ? "Directory" : 
+                              S_ISLNK(e->st.st_mode) ? "Symbolic Link" : "File";
+            
+            snprintf(info, sizeof(info), 
+                     "Name: %s | Type: %s | Size: %s | Perms: %s | Owner: %s | Group: %s | Inode: %llu | Modified: %s | Accessed: %s | Press any key...",
+                     e->name, type, size_str, perms,
+                     pw ? pw->pw_name : "?", gr ? gr->gr_name : "?",
+                     (unsigned long long)e->st.st_ino, mtime_str, atime_str);
+            
+            show_status(status, info);
+            doupdate();
+            wgetch(stdscr);
         }
         else if (ch == 'o' || ch == 'O') {
             if (count == 0) continue;
