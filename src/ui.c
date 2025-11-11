@@ -51,9 +51,10 @@ static void draw_list(WINDOW *win, fm_entry *items, int count, int sel, int offs
     int h = getmaxy(win), w = getmaxx(win);
     werase(win);
 
-    /* Column headers on row 0 */
+    /* Column headers on row 0 - using exact same spacing as data rows */
     wattron(win, COLOR_PAIR(2) | A_BOLD);
-    mvwprintw(win, 0, 0, " Perms      Size    Owner    Group   Modified          Name");
+    mvwprintw(win, 0, 0, " %-10s %7s %-12s %-10s %-16s %s",
+              "Perms", "Size", "Owner", "Group", "Modified", "Name");
     wattroff(win, COLOR_PAIR(2) | A_BOLD);
 
     /* Items from row 1 .. h-1 */
@@ -92,13 +93,8 @@ static void draw_list(WINDOW *win, fm_entry *items, int count, int sel, int offs
             wattron(win, COLOR_PAIR(color_pair));
         }
 
-        /* Print with safe width (truncate name if too long) */
-        int name_col = 56;
-        char name_fmt[64];
-        snprintf(name_fmt, sizeof(name_fmt), " %%-%ds %%s", name_col - 1); /* name area reserved (not perfect but OK) */
-
-        /* Better: print fixed fields then name separately to avoid printf width surprises */
-        mvwprintw(win, row, 0, " %-10s %7s %-8s %-8s %s  ",
+        /* Print fixed fields with consistent spacing: Perms(10) Size(7) Owner(12) Group(10) Modified(16) */
+        mvwprintw(win, row, 0, " %-10s %7s %-12s %-10s %-16s ",
                   perms, size_str, owner, group, mtime);
 
         /* Print name; ensure it doesn't overflow window width */
