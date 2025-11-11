@@ -20,19 +20,30 @@ static void format_size(off_t size, char *buf, size_t bufsize) {
     else snprintf(buf, bufsize, "%.1fG", size/(1024.0*1024.0*1024.0));
 }
 
+/* Get file type character */
+static char get_file_type(mode_t mode) {
+    if (S_ISREG(mode)) return '-';       /* Regular file */
+    if (S_ISDIR(mode)) return 'd';       /* Directory */
+    if (S_ISLNK(mode)) return 'l';       /* Symbolic link */
+    if (S_ISCHR(mode)) return 'c';       /* Character device */
+    if (S_ISBLK(mode)) return 'b';       /* Block device */
+    if (S_ISFIFO(mode)) return 'p';      /* Named pipe (FIFO) */
+    if (S_ISSOCK(mode)) return 's';      /* Socket */
+    return '?';                           /* Unknown */
+}
+
 /* Convert mode to permission string */
 static void format_perms(mode_t mode, char *buf) {
-    buf[0] = S_ISDIR(mode) ? 'd' : S_ISLNK(mode) ? 'l' : '-';
-    buf[1] = (mode & S_IRUSR) ? 'r' : '-';
-    buf[2] = (mode & S_IWUSR) ? 'w' : '-';
-    buf[3] = (mode & S_IXUSR) ? 'x' : '-';
-    buf[4] = (mode & S_IRGRP) ? 'r' : '-';
-    buf[5] = (mode & S_IWGRP) ? 'w' : '-';
-    buf[6] = (mode & S_IXGRP) ? 'x' : '-';
-    buf[7] = (mode & S_IROTH) ? 'r' : '-';
-    buf[8] = (mode & S_IWOTH) ? 'w' : '-';
-    buf[9] = (mode & S_IXOTH) ? 'x' : '-';
-    buf[10] = '\0';
+    buf[0] = (mode & S_IRUSR) ? 'r' : '-';
+    buf[1] = (mode & S_IWUSR) ? 'w' : '-';
+    buf[2] = (mode & S_IXUSR) ? 'x' : '-';
+    buf[3] = (mode & S_IRGRP) ? 'r' : '-';
+    buf[4] = (mode & S_IWGRP) ? 'w' : '-';
+    buf[5] = (mode & S_IXGRP) ? 'x' : '-';
+    buf[6] = (mode & S_IROTH) ? 'r' : '-';
+    buf[7] = (mode & S_IWOTH) ? 'w' : '-';
+    buf[8] = (mode & S_IXOTH) ? 'x' : '-';
+    buf[9] = '\0';
 }
 
 /* Draw top header (single row) */
@@ -51,10 +62,10 @@ static void draw_list(WINDOW *win, fm_entry *items, int count, int sel, int offs
     int h = getmaxy(win), w = getmaxx(win);
     werase(win);
 
-    /* Column headers on row 0 - using exact same spacing as data rows */
+    /* Column headers on row 0 - Type Links Perms Size Owner Group Modified Name */
     wattron(win, COLOR_PAIR(2) | A_BOLD);
-    mvwprintw(win, 0, 0, " %-10s %7s %-12s %-10s %-16s %s",
-              "Perms", "Size", "Owner", "Group", "Modified", "Name");
+    mvwprintw(win, 0, 0, " %s %5s %-9s %7s %-12s %-10s %-16s %s",
+              "T", "Links", "Perms", "Size", "Owner", "Group", "Modified", "Name");
     wattroff(win, COLOR_PAIR(2) | A_BOLD);
 
     /* Items from row 1 .. h-1 */
@@ -62,6 +73,8 @@ static void draw_list(WINDOW *win, fm_entry *items, int count, int sel, int offs
         int idx = row - 1 + offset;
         fm_entry *e = &items[idx];
 
+        char file_type = get_file_type(e->st.st_mode);
+        nlink_t links = e->st.st_nlink;
         char perms[12] = {0}, size_str[16] = {0}, owner[32] = {0}, group[32] = {0}, mtime[32] = {0};
         format_perms(e->st.st_mode, perms);
         format_size(e->st.st_size, size_str, sizeof(size_str));
@@ -93,9 +106,9 @@ static void draw_list(WINDOW *win, fm_entry *items, int count, int sel, int offs
             wattron(win, COLOR_PAIR(color_pair));
         }
 
-        /* Print fixed fields with consistent spacing: Perms(10) Size(7) Owner(12) Group(10) Modified(16) */
-        mvwprintw(win, row, 0, " %-10s %7s %-12s %-10s %-16s ",
-                  perms, size_str, owner, group, mtime);
+        /* Print fixed fields: Type(1) Links(5) Perms(9) Size(7) Owner(12) Group(10) Modified(16) */
+        mvwprintw(win, row, 0, " %c %5lu %-9s %7s %-12s %-10s %-16s ",
+                  file_type, (unsigned long)links, perms, size_str, owner, group, mtime);
 
         /* Print name; ensure it doesn't overflow window width */
         int x = getcurx(win);
