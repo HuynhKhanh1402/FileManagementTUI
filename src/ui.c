@@ -136,7 +136,7 @@ static void show_status(WINDOW *win, const char *msg) {
 static void draw_help_bar(WINDOW *win) {
     werase(win);
     wattron(win, COLOR_PAIR(4));
-    mvwprintw(win, 0, 0, " [q]Quit [Enter]Open [Bksp]Up [n]NewDir [f]NewFile [d]Del [r]Rename [c]Copy [i]Info [o]View");
+    mvwprintw(win, 0, 0, " [q]Quit [Enter]Open [Bksp]Up [n]NewDir [f]NewFile [d]Del [r]Rename [m]Move [c]Copy [i]Info [o]View");
     wattroff(win, COLOR_PAIR(4));
     wnoutrefresh(win);
 }
@@ -365,6 +365,47 @@ int fm_ui_run(const char *startpath) {
                     show_status(status, "✓ Renamed successfully. Press any key...");
                 } else {
                     show_status(status, "✗ Rename failed. Press any key...");
+                }
+                doupdate();
+                wgetch(stdscr);
+            }
+        }
+        else if (ch == 'm' || ch == 'M') {
+            if (count == 0) continue;
+            fm_entry *e = &items[sel];
+            char destdir[PATH_MAX];
+            prompt_input(status, "Move to directory (absolute or relative path): ", destdir, sizeof(destdir));
+            if (strlen(destdir) > 0) {
+                char resolved[PATH_MAX];
+                char dest_path[PATH_MAX];
+                
+                /* Resolve destination directory path */
+                if (destdir[0] == '/') {
+                    /* Absolute path */
+                    strncpy(resolved, destdir, sizeof(resolved) - 1);
+                    resolved[sizeof(resolved) - 1] = '\0';
+                } else {
+                    /* Relative path - resolve from current directory */
+                    snprintf(resolved, sizeof(resolved), "%s/%s", cwd, destdir);
+                }
+                
+                /* Check if destination directory exists */
+                struct stat st;
+                if (stat(resolved, &st) != 0 || !S_ISDIR(st.st_mode)) {
+                    show_status(status, "✗ Destination directory does not exist. Press any key...");
+                    doupdate();
+                    wgetch(stdscr);
+                    continue;
+                }
+                
+                /* Build final destination path with filename */
+                snprintf(dest_path, sizeof(dest_path), "%s/%s", resolved, e->name);
+                
+                if (fm_rename(e->path, dest_path) == 0) {
+                    show_status(status, "✓ Moved successfully. Press any key...");
+                    if (sel > 0) sel--;
+                } else {
+                    show_status(status, "✗ Move failed (destination may already exist). Press any key...");
                 }
                 doupdate();
                 wgetch(stdscr);

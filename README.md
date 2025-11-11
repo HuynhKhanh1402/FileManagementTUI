@@ -1,4 +1,14 @@
-# 📁 Terminal File Manager
+# 📁 T- 📂 Navigate directories with intuitive controls
+- 📊 View detailed file information (size, permissions, owner, group, modification time)
+- ➕ Create new directories
+- 📄 Create new empty files (like `touch` command)
+- ℹ️ Display comprehensive info about files/directories (includes access time, inode, etc.)
+- 🗑️ Delete files and directories (with confirmation)
+- ✏️ Rename files and directories
+- 🚀 Move files/directories to another location (supports absolute and relative paths)
+- 📋 Copy files
+- 👁️ View file contents with system pager
+- 🎨 Color-coded interface with ncurses (blue=dir, green=file, cyan=link)le Manager
 
 A professional terminal-based file manager written in C using ncurses library. Features a clean interface with detailed file information display.
 
@@ -93,7 +103,8 @@ make rebuild
 | `n` | Create new directory |
 | `f` | Create new file (like touch) |
 | `d` | Delete selected item (with confirmation) |
-| `r` | Rename/move selected item |
+| `r` | Rename selected item in current directory |
+| `m` | Move item to another directory (absolute or relative path) |
 | `c` | Copy selected file |
 | `i` | Show detailed information about selected item |
 | `o` | Open file with `$PAGER` (default: `less`) |
