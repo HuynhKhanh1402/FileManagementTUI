@@ -75,7 +75,22 @@ static void draw_list(WINDOW *win, fm_entry *items, int count, int sel, int offs
         if (tm) strftime(mtime, sizeof(mtime), "%Y-%m-%d %H:%M", tm);
         else snprintf(mtime, sizeof(mtime), "0000-00-00 00:00");
 
-        if (idx == sel) wattron(win, COLOR_PAIR(3) | A_REVERSE);
+        /* Determine color based on file type */
+        int color_pair;
+        if (S_ISDIR(e->st.st_mode)) {
+            color_pair = 5;  /* Blue for directories */
+        } else if (S_ISLNK(e->st.st_mode)) {
+            color_pair = 7;  /* Cyan for symbolic links */
+        } else {
+            color_pair = 6;  /* Green for regular files */
+        }
+
+        /* Apply selection highlight or type color */
+        if (idx == sel) {
+            wattron(win, COLOR_PAIR(3) | A_REVERSE);
+        } else {
+            wattron(win, COLOR_PAIR(color_pair));
+        }
 
         /* Print with safe width (truncate name if too long) */
         int name_col = 56;
@@ -101,7 +116,12 @@ static void draw_list(WINDOW *win, fm_entry *items, int count, int sel, int offs
             }
         }
 
-        if (idx == sel) wattroff(win, COLOR_PAIR(3) | A_REVERSE);
+        /* Turn off attributes */
+        if (idx == sel) {
+            wattroff(win, COLOR_PAIR(3) | A_REVERSE);
+        } else {
+            wattroff(win, COLOR_PAIR(color_pair));
+        }
     }
 
     wnoutrefresh(win);
@@ -178,6 +198,9 @@ int fm_ui_run(const char *startpath) {
     init_pair(2, COLOR_YELLOW, -1);  /* column headers */
     init_pair(3, COLOR_WHITE, -1);   /* selection */
     init_pair(4, COLOR_BLACK, COLOR_WHITE); /* status/help bar */
+    init_pair(5, COLOR_BLUE, -1);    /* directory */
+    init_pair(6, COLOR_GREEN, -1);   /* regular file */
+    init_pair(7, COLOR_CYAN, -1);    /* symbolic link */
 
     noecho();
     curs_set(0);
