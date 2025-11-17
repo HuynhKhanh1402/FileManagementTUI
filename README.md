@@ -8,6 +8,7 @@
 - 🚀 Move files/directories to another location (supports absolute and relative paths)
 - 📋 Copy files
 - 👁️ View file contents with system pager
+- ✏️ Edit files with nano (fallback to vim)
 - 🎨 Color-coded interface with ncurses (blue=dir, green=file, cyan=link)le Manager
 
 A professional terminal-based file manager written in C using ncurses library. Features a clean interface with detailed file information display.
@@ -19,10 +20,11 @@ A professional terminal-based file manager written in C using ncurses library. F
 - ➕ Create new directories
 - � Create new empty files (like `touch` command)
 - ℹ️ Display comprehensive info about files/directories (includes access time, inode, etc.)
-- �🗑️ Delete files and directories (with confirmation)
+- 🗑️ Delete files and directories (with confirmation)
 - ✏️ Rename/move files and directories
 - 📋 Copy files
 - 👁️ View file contents with system pager
+- ✏️ Edit files with nano (fallback to vim)
 - 🎨 Color-coded interface with ncurses
 
 ## 🏗️ Project Structure
@@ -109,6 +111,7 @@ make rebuild
 | `c` | Copy selected file |
 | `i` | Show detailed information about selected item |
 | `o` | Open file with `$PAGER` (default: `less`) |
+| `e` | Edit file with nano (fallback to vim if nano not available) |
 | `q` | Quit application |
 
 ## 📝 Notes

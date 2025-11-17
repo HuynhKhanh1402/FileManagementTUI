@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <limits.h>
 
 static int entry_cmp(const void *pa, const void *pb) {
     const fm_entry *a = pa;
@@ -86,4 +87,78 @@ int fm_create_file(const char *path) {
     if (fd < 0) return -1;
     close(fd);
     return 0;
+}
+
+int fm_edit_file(const char *path) {
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        return -1;  // File doesn't exist
+    }
+    
+    // Check if it's a regular file
+    if (!S_ISREG(st.st_mode)) {
+        return -2;  // Not a regular file
+    }
+    
+    // Determine which editor to use: nano > vim > error
+    const char *editor = NULL;
+    
+    // Check if nano is available
+    if (system("command -v nano > /dev/null 2>&1") == 0) {
+        editor = "nano";
+    }
+    // If nano not found, check for vim
+    else if (system("command -v vim > /dev/null 2>&1") == 0) {
+        editor = "vim";
+    }
+    // Neither nano nor vim available
+    else {
+        return -3;  // No suitable editor found
+    }
+    
+    // Build command (simple quoting with single quotes)
+    char command[PATH_MAX * 2];
+    snprintf(command, sizeof(command), "%s '%s'", editor, path);
+    
+    // Execute editor
+    int result = system(command);
+    
+    return result;
+}
+
+ssize_t fm_read_file(const char *path, char **content_out) {
+    int fd = open(path, O_RDONLY);
+    if (fd < 0) return -1;
+    
+    struct stat st;
+    if (fstat(fd, &st) < 0) {
+        close(fd);
+        return -1;
+    }
+    
+    // Allocate buffer for file content plus null terminator
+    size_t size = st.st_size;
+    char *buf = malloc(size + 1);
+    if (!buf) {
+        close(fd);
+        return -1;
+    }
+    
+    // Read file content
+    ssize_t total = 0;
+    while (total < (ssize_t)size) {
+        ssize_t n = read(fd, buf + total, size - total);
+        if (n <= 0) {
+            if (n < 0 && errno == EINTR) continue;
+            free(buf);
+            close(fd);
+            return -1;
+        }
+        total += n;
+    }
+    
+    buf[total] = '\0';
+    close(fd);
+    *content_out = buf;
+    return total;
 }

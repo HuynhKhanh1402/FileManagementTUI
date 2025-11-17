@@ -149,7 +149,7 @@ static void show_status(WINDOW *win, const char *msg) {
 static void draw_help_bar(WINDOW *win) {
     werase(win);
     wattron(win, COLOR_PAIR(4));
-    mvwprintw(win, 0, 0, " [q]Quit [Enter]Open [Bksp]Up [n]NewDir [f]NewFile [d]Del [r]Rename [m]Move [c]Copy [i]Info [o]View");
+    mvwprintw(win, 0, 0, " [q]Quit [Enter]Open [Bksp]Up [n]NewDir [f]NewFile [d]Del [r]Rename [m]Move [c]Copy [i]Info [o]View [e]Edit");
     wattroff(win, COLOR_PAIR(4));
     wnoutrefresh(win);
 }
@@ -187,6 +187,150 @@ static void resize_windows(WINDOW **header, WINDOW **listw, WINDOW **status) {
     mvwin(*status, h - 1, 0);
 
     /* Make sure curses redraws everything */
+    clear();
+    refresh();
+}
+
+/* View file content with scrolling capability */
+static void view_file_content(const char *filepath) {
+    char *content = NULL;
+    ssize_t size = fm_read_file(filepath, &content);
+    
+    if (size < 0 || !content) {
+        /* Show error message */
+        clear();
+        mvprintw(0, 0, "Error: Unable to read file '%s'", filepath);
+        mvprintw(1, 0, "Press any key to return...");
+        refresh();
+        getch();
+        return;
+    }
+    
+    /* Split content into lines */
+    int line_count = 0;
+    int line_cap = 1024;
+    char **lines = malloc(line_cap * sizeof(char*));
+    if (!lines) {
+        free(content);
+        return;
+    }
+    
+    char *p = content;
+    char *line_start = p;
+    while (*p) {
+        if (*p == '\n') {
+            /* Allocate space for line and copy it */
+            int len = p - line_start;
+            lines[line_count] = malloc(len + 1);
+            if (lines[line_count]) {
+                memcpy(lines[line_count], line_start, len);
+                lines[line_count][len] = '\0';
+                line_count++;
+                
+                /* Expand array if needed */
+                if (line_count >= line_cap) {
+                    line_cap *= 2;
+                    char **tmp = realloc(lines, line_cap * sizeof(char*));
+                    if (tmp) lines = tmp;
+                }
+            }
+            line_start = p + 1;
+        }
+        p++;
+    }
+    
+    /* Handle last line if it doesn't end with newline */
+    if (line_start < p) {
+        int len = p - line_start;
+        lines[line_count] = malloc(len + 1);
+        if (lines[line_count]) {
+            memcpy(lines[line_count], line_start, len);
+            lines[line_count][len] = '\0';
+            line_count++;
+        }
+    }
+    
+    free(content);
+    
+    /* Display file content with scrolling */
+    int offset = 0;
+    int h, w;
+    
+    while (1) {
+        getmaxyx(stdscr, h, w);
+        clear();
+        
+        /* Header */
+        attron(COLOR_PAIR(1) | A_BOLD);
+        mvprintw(0, 0, " File Viewer: %s", filepath);
+        mvprintw(0, w - 30, " Lines: %d", line_count);
+        attroff(COLOR_PAIR(1) | A_BOLD);
+        
+        /* Content area (leave 2 rows for header and footer) */
+        int content_h = h - 2;
+        for (int i = 0; i < content_h && (i + offset) < line_count; i++) {
+            int line_idx = i + offset;
+            /* Show line number and content */
+            attron(COLOR_PAIR(2));
+            mvprintw(i + 1, 0, "%5d ", line_idx + 1);
+            attroff(COLOR_PAIR(2));
+            
+            /* Truncate line if too long */
+            if (strlen(lines[line_idx]) > (size_t)(w - 7)) {
+                char truncated[4096];
+                strncpy(truncated, lines[line_idx], w - 10);
+                truncated[w - 10] = '\0';
+                strcat(truncated, "...");
+                printw("%s", truncated);
+            } else {
+                printw("%s", lines[line_idx]);
+            }
+        }
+        
+        /* Footer / Help bar */
+        attron(COLOR_PAIR(4));
+        mvprintw(h - 1, 0, " [q]Quit [UP/DOWN]Scroll [PgUp/PgDn]Page [Home]Top [End]Bottom");
+        /* Pad rest of line */
+        for (int x = getcurx(stdscr); x < w; x++) addch(' ');
+        attroff(COLOR_PAIR(4));
+        
+        refresh();
+        
+        int ch = getch();
+        if (ch == 'q' || ch == 'Q' || ch == 27) break; /* ESC also exits */
+        else if (ch == KEY_DOWN) {
+            if (offset + content_h < line_count) offset++;
+        }
+        else if (ch == KEY_UP) {
+            if (offset > 0) offset--;
+        }
+        else if (ch == KEY_NPAGE) { /* Page Down */
+            offset += content_h;
+            if (offset + content_h > line_count) {
+                offset = line_count - content_h;
+                if (offset < 0) offset = 0;
+            }
+        }
+        else if (ch == KEY_PPAGE) { /* Page Up */
+            offset -= content_h;
+            if (offset < 0) offset = 0;
+        }
+        else if (ch == KEY_HOME) {
+            offset = 0;
+        }
+        else if (ch == KEY_END) {
+            offset = line_count - content_h;
+            if (offset < 0) offset = 0;
+        }
+    }
+    
+    /* Cleanup */
+    for (int i = 0; i < line_count; i++) {
+        free(lines[i]);
+    }
+    free(lines);
+    
+    /* Force complete redraw when returning to main UI */
     clear();
     refresh();
 }
@@ -488,19 +632,47 @@ int fm_ui_run(const char *startpath) {
                 wgetch(stdscr);
                 continue;
             }
-            /* open with pager in normal mode */
-            def_prog_mode();
-            endwin();
-            const char *pager = getenv("PAGER"); if (!pager) pager = "less";
-            char cmd[PATH_MAX * 2];
-            snprintf(cmd, sizeof(cmd), "%s '%s'", pager, e->path); /* note: simplistic quoting */
-            system(cmd);
-            reset_prog_mode();
+            /* View file with custom file viewer */
+            view_file_content(e->path);
             /* Force complete redraw */
             clearok(stdscr, TRUE);
             clear();
             refresh();
             /* redraw next loop iteration will draw everything */
+        }
+        else if (ch == 'e' || ch == 'E') {
+            if (count == 0) continue;
+            fm_entry *e = &items[sel];
+            if (e->is_dir) {
+                show_status(status, "✗ Cannot edit directory. Press any key...");
+                doupdate();
+                wgetch(stdscr);
+                continue;
+            }
+            /* Edit file with nano or vim */
+            def_prog_mode();
+            endwin();
+            int result = fm_edit_file(e->path);
+            reset_prog_mode();
+            /* Force complete redraw */
+            clearok(stdscr, TRUE);
+            clear();
+            refresh();
+            
+            if (result == -2) {
+                show_status(status, "✗ Can only edit regular files. Press any key...");
+                doupdate();
+                wgetch(stdscr);
+            } else if (result == -3) {
+                show_status(status, "✗ No editor found (nano or vim required). Press any key...");
+                doupdate();
+                wgetch(stdscr);
+            } else if (result != 0) {
+                show_status(status, "✗ Editor returned an error. Press any key...");
+                doupdate();
+                wgetch(stdscr);
+            }
+            /* File list will be refreshed in next loop iteration */
         }
         else if (ch == KEY_RESIZE) {
             /* Recreate/resize windows to match new terminal size */
