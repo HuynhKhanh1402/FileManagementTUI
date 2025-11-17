@@ -154,19 +154,70 @@ static void draw_help_bar(WINDOW *win) {
     wnoutrefresh(win);
 }
 
-/* Prompt input in provided window; result placed in buf */
+/* Trim leading and trailing whitespace from string */
+static void trim_string(char *str) {
+    if (!str || !*str) return;
+    
+    /* Trim leading whitespace */
+    char *start = str;
+    while (*start && (*start == ' ' || *start == '\t' || *start == '\n' || *start == '\r')) {
+        start++;
+    }
+    
+    /* Trim trailing whitespace */
+    char *end = start + strlen(start) - 1;
+    while (end > start && (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r')) {
+        *end = '\0';
+        end--;
+    }
+    
+    /* Move trimmed string to beginning if needed */
+    if (start != str) {
+        memmove(str, start, strlen(start) + 1);
+    }
+}
+
+/* Prompt input in provided window; result placed in buf (trimmed) */
 static int prompt_input(WINDOW *win, const char *prompt, char *buf, int bufsize) {
+    if (!win || !prompt || !buf || bufsize <= 0) return -1;
+    
     echo();
     curs_set(1);
     werase(win);
-    mvwprintw(win, 0, 0, "%s", prompt);
+    
+    /* Display prompt */
+    wattron(win, COLOR_PAIR(4));
+    mvwprintw(win, 0, 0, " %s", prompt);
+    wattroff(win, COLOR_PAIR(4));
     wclrtoeol(win);
     wrefresh(win);
-    /* Use wgetnstr so it's shown in the given window */
-    wgetnstr(win, buf, bufsize - 1);
+    
+    /* Get input */
+    int result = wgetnstr(win, buf, bufsize - 1);
+    buf[bufsize - 1] = '\0';
+    
+    /* Trim whitespace */
+    trim_string(buf);
+    
     noecho();
     curs_set(0);
-    return 0;
+    
+    return result;
+}
+
+/* Build path safely, return 0 on success, -1 on truncation */
+static int build_path(char *dest, size_t dest_size, const char *dir, const char *name) {
+    if (!dest || !dir || !name) return -1;
+    
+    int ret = snprintf(dest, dest_size, "%s/%s", dir, name);
+    return (ret >= (int)dest_size) ? -1 : 0;
+}
+
+/* Show status message and wait for key press */
+static void show_status_and_wait(WINDOW *win, const char *msg) {
+    show_status(win, msg);
+    doupdate();
+    wgetch(stdscr);
 }
 
 /* Resize windows when terminal changes size */
@@ -464,130 +515,122 @@ int fm_ui_run(const char *startpath) {
         }
         else if (ch == 'n' || ch == 'N') {
             char name[PATH_MAX];
-            prompt_input(status, "New directory name: ", name, sizeof(name));
-            if (strlen(name) > 0) {
-                char path[PATH_MAX];
-                snprintf(path, sizeof(path), "%s/%s", cwd, name);
-                if (fm_mkdir(path) == 0) {
-                    show_status(status, "✓ Directory created successfully. Press any key...");
+            if (prompt_input(status, "New directory name:", name, sizeof(name)) == 0 && strlen(name) > 0) {
+                char path[PATH_MAX * 2];
+                if (build_path(path, sizeof(path), cwd, name) == -1) {
+                    show_status_and_wait(status, "✗ Path too long. Press any key...");
+                } else if (fm_mkdir(path) == 0) {
+                    show_status_and_wait(status, "✓ Directory created successfully. Press any key...");
                 } else {
-                    show_status(status, "✗ Failed to create directory. Press any key...");
+                    show_status_and_wait(status, "✗ Failed to create directory. Press any key...");
                 }
-                doupdate();
-                wgetch(stdscr);
             }
         }
         else if (ch == 'f' || ch == 'F') {
             char name[PATH_MAX];
-            prompt_input(status, "New file name: ", name, sizeof(name));
-            if (strlen(name) > 0) {
-                char path[PATH_MAX];
-                snprintf(path, sizeof(path), "%s/%s", cwd, name);
-                if (fm_create_file(path) == 0) {
-                    show_status(status, "✓ File created successfully. Press any key...");
+            if (prompt_input(status, "New file name:", name, sizeof(name)) == 0 && strlen(name) > 0) {
+                char path[PATH_MAX * 2];
+                if (build_path(path, sizeof(path), cwd, name) == -1) {
+                    show_status_and_wait(status, "✗ Path too long. Press any key...");
+                } else if (fm_create_file(path) == 0) {
+                    show_status_and_wait(status, "✓ File created successfully. Press any key...");
                 } else {
-                    show_status(status, "✗ Failed to create file (may already exist). Press any key...");
+                    show_status_and_wait(status, "✗ Failed to create file (may already exist). Press any key...");
                 }
-                doupdate();
-                wgetch(stdscr);
             }
         }
         else if (ch == 'd' || ch == 'D') {
             if (count == 0) continue;
             fm_entry *e = &items[sel];
-            char q[512]; snprintf(q, sizeof(q), "Delete '%s'? [y/n]", e->name);
+            char q[1024];
+            snprintf(q, sizeof(q), "Delete '%s'? [y/n]", e->name);
             show_status(status, q);
             doupdate();
             int c = wgetch(stdscr);
             if (c == 'y' || c == 'Y') {
                 if (fm_remove(e->path) == 0) {
-                    show_status(status, "✓ Deleted successfully. Press any key...");
+                    show_status_and_wait(status, "✓ Deleted successfully. Press any key...");
                     if (sel >= count - 1 && sel > 0) sel--;
                 } else {
-                    show_status(status, "✗ Delete failed (may be non-empty dir). Press any key...");
+                    show_status_and_wait(status, "✗ Delete failed (may be non-empty dir). Press any key...");
                 }
-                doupdate();
-                wgetch(stdscr);
             }
         }
         else if (ch == 'r' || ch == 'R') {
             if (count == 0) continue;
             fm_entry *e = &items[sel];
             char name[PATH_MAX];
-            prompt_input(status, "Rename to: ", name, sizeof(name));
-            if (strlen(name) > 0) {
-                char path[PATH_MAX];
-                snprintf(path, sizeof(path), "%s/%s", cwd, name);
-                if (fm_rename(e->path, path) == 0) {
-                    show_status(status, "✓ Renamed successfully. Press any key...");
+            if (prompt_input(status, "Rename to:", name, sizeof(name)) == 0 && strlen(name) > 0) {
+                char path[PATH_MAX * 2];
+                if (build_path(path, sizeof(path), cwd, name) == -1) {
+                    show_status_and_wait(status, "✗ Path too long. Press any key...");
+                } else if (fm_rename(e->path, path) == 0) {
+                    show_status_and_wait(status, "✓ Renamed successfully. Press any key...");
                 } else {
-                    show_status(status, "✗ Rename failed. Press any key...");
+                    show_status_and_wait(status, "✗ Rename failed. Press any key...");
                 }
-                doupdate();
-                wgetch(stdscr);
             }
         }
         else if (ch == 'm' || ch == 'M') {
             if (count == 0) continue;
             fm_entry *e = &items[sel];
             char destdir[PATH_MAX];
-            prompt_input(status, "Move to directory (absolute or relative path): ", destdir, sizeof(destdir));
-            if (strlen(destdir) > 0) {
-                char resolved[PATH_MAX];
-                char dest_path[PATH_MAX];
-                
-                /* Resolve destination directory path */
-                if (destdir[0] == '/') {
-                    /* Absolute path */
-                    strncpy(resolved, destdir, sizeof(resolved) - 1);
-                    resolved[sizeof(resolved) - 1] = '\0';
-                } else {
-                    /* Relative path - resolve from current directory */
-                    snprintf(resolved, sizeof(resolved), "%s/%s", cwd, destdir);
-                }
-                
-                /* Check if destination directory exists */
-                struct stat st;
-                if (stat(resolved, &st) != 0 || !S_ISDIR(st.st_mode)) {
-                    show_status(status, "✗ Destination directory does not exist. Press any key...");
-                    doupdate();
-                    wgetch(stdscr);
+            if (prompt_input(status, "Move to directory (path):", destdir, sizeof(destdir)) != 0 || strlen(destdir) == 0) {
+                continue;
+            }
+            
+            char resolved[PATH_MAX * 2];
+            char dest_path[PATH_MAX * 2];
+            
+            /* Resolve destination directory path */
+            if (destdir[0] == '/') {
+                /* Absolute path */
+                strncpy(resolved, destdir, sizeof(resolved) - 1);
+                resolved[sizeof(resolved) - 1] = '\0';
+            } else {
+                /* Relative path */
+                if (build_path(resolved, sizeof(resolved), cwd, destdir) == -1) {
+                    show_status_and_wait(status, "✗ Path too long. Press any key...");
                     continue;
                 }
-                
-                /* Build final destination path with filename */
-                snprintf(dest_path, sizeof(dest_path), "%s/%s", resolved, e->name);
-                
-                if (fm_rename(e->path, dest_path) == 0) {
-                    show_status(status, "✓ Moved successfully. Press any key...");
-                    if (sel > 0) sel--;
-                } else {
-                    show_status(status, "✗ Move failed (destination may already exist). Press any key...");
-                }
-                doupdate();
-                wgetch(stdscr);
+            }
+            
+            /* Check if destination directory exists */
+            struct stat st;
+            if (stat(resolved, &st) != 0 || !S_ISDIR(st.st_mode)) {
+                show_status_and_wait(status, "✗ Destination directory does not exist. Press any key...");
+                continue;
+            }
+            
+            /* Build final destination path with filename */
+            if (build_path(dest_path, sizeof(dest_path), resolved, e->name) == -1) {
+                show_status_and_wait(status, "✗ Destination path too long. Press any key...");
+                continue;
+            }
+            
+            if (fm_rename(e->path, dest_path) == 0) {
+                show_status_and_wait(status, "✓ Moved successfully. Press any key...");
+                if (sel > 0) sel--;
+            } else {
+                show_status_and_wait(status, "✗ Move failed (destination may already exist). Press any key...");
             }
         }
         else if (ch == 'c' || ch == 'C') {
             if (count == 0) continue;
             fm_entry *e = &items[sel];
             if (e->is_dir) {
-                show_status(status, "✗ Copy directory not supported. Press any key...");
-                doupdate();
-                wgetch(stdscr);
+                show_status_and_wait(status, "✗ Copy directory not supported. Press any key...");
             } else {
                 char name[PATH_MAX];
-                prompt_input(status, "Copy to (name): ", name, sizeof(name));
-                if (strlen(name) > 0) {
-                    char path[PATH_MAX];
-                    snprintf(path, sizeof(path), "%s/%s", cwd, name);
-                    if (fm_copy_file(e->path, path) == 0) {
-                        show_status(status, "✓ File copied successfully. Press any key...");
+                if (prompt_input(status, "Copy to (name):", name, sizeof(name)) == 0 && strlen(name) > 0) {
+                    char path[PATH_MAX * 2];
+                    if (build_path(path, sizeof(path), cwd, name) == -1) {
+                        show_status_and_wait(status, "✗ Path too long. Press any key...");
+                    } else if (fm_copy_file(e->path, path) == 0) {
+                        show_status_and_wait(status, "✓ File copied successfully. Press any key...");
                     } else {
-                        show_status(status, "✗ Copy failed. Press any key...");
+                        show_status_and_wait(status, "✗ Copy failed. Press any key...");
                     }
-                    doupdate();
-                    wgetch(stdscr);
                 }
             }
         }
