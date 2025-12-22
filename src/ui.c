@@ -136,6 +136,7 @@ static void draw_list(WINDOW *win, fm_entry *items, int count, int sel, int offs
     wnoutrefresh(win);
 }
 
+
 /* Show one-line status message at bottom */
 static void show_status(WINDOW *win, const char *msg) {
     werase(win);
@@ -143,6 +144,52 @@ static void show_status(WINDOW *win, const char *msg) {
     mvwprintw(win, 0, 0, " %s", msg);
     wattroff(win, COLOR_PAIR(4));
     wnoutrefresh(win);
+}
+
+/* Show detailed file/folder info in a full screen overlay */
+static void view_file_info(const fm_entry *e) {
+    char perms[12], size_str[16];
+    format_perms(e->st.st_mode, perms);
+    format_size(e->st.st_size, size_str, sizeof(size_str));
+    struct passwd *pw = getpwuid(e->st.st_uid);
+    struct group *gr = getgrgid(e->st.st_gid);
+    struct tm *tm_mtime = localtime(&e->st.st_mtime);
+    struct tm *tm_atime = localtime(&e->st.st_atime);
+    char mtime_str[64], atime_str[64];
+    strftime(mtime_str, sizeof(mtime_str), "%Y-%m-%d %H:%M:%S", tm_mtime);
+    strftime(atime_str, sizeof(atime_str), "%Y-%m-%d %H:%M:%S", tm_atime);
+    const char *type = e->is_dir ? "Directory" : S_ISLNK(e->st.st_mode) ? "Symbolic Link" : "File";
+
+    int h, w;
+    getmaxyx(stdscr, h, w);
+    clear();
+    attron(COLOR_PAIR(1) | A_BOLD);
+    mvprintw(0, 0, " File Info: %s", e->name);
+    attroff(COLOR_PAIR(1) | A_BOLD);
+
+    int row = 2;
+    attron(COLOR_PAIR(2));
+    mvprintw(row++, 2, "Type:       %s", type);
+    if (!e->is_dir) {
+        mvprintw(row++, 2, "Size:       %s", size_str);
+    }
+    mvprintw(row++, 2, "Perms:      %s", perms);
+    mvprintw(row++, 2, "Owner:      %s", pw ? pw->pw_name : "?");
+    mvprintw(row++, 2, "Group:      %s", gr ? gr->gr_name : "?");
+    mvprintw(row++, 2, "Inode:      %llu", (unsigned long long)e->st.st_ino);
+    mvprintw(row++, 2, "Modified:   %s", mtime_str);
+    mvprintw(row++, 2, "Accessed:   %s", atime_str);
+    mvprintw(row++, 2, "Path:       %s", e->path);
+    attroff(COLOR_PAIR(2));
+
+    attron(COLOR_PAIR(4));
+    mvprintw(h - 2, 0, " Press any key to return...");
+    for (int x = getcurx(stdscr); x < w; x++) addch(' ');
+    attroff(COLOR_PAIR(4));
+    refresh();
+    getch();
+    clear();
+    refresh();
 }
 
 /* Help bar (bottom) */
@@ -637,34 +684,11 @@ int fm_ui_run(const char *startpath) {
         else if (ch == 'i' || ch == 'I') {
             if (count == 0) continue;
             fm_entry *e = &items[sel];
-            
-            /* Build detailed info string */
-            char info[2048];
-            char perms[12], size_str[16];
-            format_perms(e->st.st_mode, perms);
-            format_size(e->st.st_size, size_str, sizeof(size_str));
-            
-            struct passwd *pw = getpwuid(e->st.st_uid);
-            struct group *gr = getgrgid(e->st.st_gid);
-            struct tm *tm_mtime = localtime(&e->st.st_mtime);
-            struct tm *tm_atime = localtime(&e->st.st_atime);
-            
-            char mtime_str[64], atime_str[64];
-            strftime(mtime_str, sizeof(mtime_str), "%Y-%m-%d %H:%M:%S", tm_mtime);
-            strftime(atime_str, sizeof(atime_str), "%Y-%m-%d %H:%M:%S", tm_atime);
-            
-            const char *type = e->is_dir ? "Directory" : 
-                              S_ISLNK(e->st.st_mode) ? "Symbolic Link" : "File";
-            
-            snprintf(info, sizeof(info), 
-                     "Name: %s | Type: %s | Size: %s | Perms: %s | Owner: %s | Group: %s | Inode: %llu | Modified: %s | Accessed: %s | Press any key...",
-                     e->name, type, size_str, perms,
-                     pw ? pw->pw_name : "?", gr ? gr->gr_name : "?",
-                     (unsigned long long)e->st.st_ino, mtime_str, atime_str);
-            
-            show_status(status, info);
-            doupdate();
-            wgetch(stdscr);
+            view_file_info(e);
+            /* Force complete redraw */
+            clearok(stdscr, TRUE);
+            clear();
+            refresh();
         }
         else if (ch == 'o' || ch == 'O') {
             if (count == 0) continue;
